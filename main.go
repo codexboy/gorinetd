@@ -1,44 +1,62 @@
 package main
 
 import (
+	"bufio"
 	"flag"
 	"fmt"
-	"net"
+	"os"
 )
 
-func ConnRW(conn net.Conn) {
-	defer conn.Close()
-	fmt.Println(conn.RemoteAddr().String())
-	buftmp := make([]byte,1024*10)
-	for true {
-		rc,err := conn.Read(buftmp)
-		if err != nil {
-			fmt.Println(err)
-			return
+type arg struct {
+	fhost string
+	thost string
+}
+
+func ParseConfLine(data []byte) arg {
+	a := new(arg)
+	tmp := make([]byte, 0)
+	for _, c := range data {
+		if c == 0x20 { //换到下一个内容
+			a.fhost = string(tmp)
+			tmp = make([]byte, 0)
+		} else if c == '\r' {
+			break
+		} else {
+			tmp = append(tmp, c)
 		}
-		fmt.Print(string(buftmp[:rc]))
 	}
+	return *a
+}
+
+func ParseConfigFile(conf string) ([]arg, error) {
+	args := make([]arg, 0)
+	fp, err := os.Open(conf)
+	if err != nil {
+		return args, err
+	}
+	bfp := bufio.NewReader(fp)
+	for true {
+		ldata, _, err := bfp.ReadLine()
+		if err != nil {
+			return args, err
+		}
+		args = append(args, ParseConfLine(ldata))
+	}
+	return args, nil
 }
 
 func main() {
-	host := flag.String("h", "127.0.0.1", "host address")
-	port := flag.Int("p", 9999, "host port")
-
+	args := flag.String("c", "", "configure file")
 	flag.Parse()
-
-	fmt.Println("Used:", fmt.Sprintf("%s:%d", *host, *port))
-	sock, err := net.Listen("tcp", fmt.Sprintf("%s:%d", *host, *port))
+	if *args == "" {
+		fmt.Println("configure not set,please use -c")
+		return
+	}
+	fmt.Println("use configure file ", *args)
+	conf, err := ParseConfigFile(*args)
 	if err != nil {
 		fmt.Println(err)
 		return
 	}
-	defer sock.Close()
-	for true {
-		conn, err := sock.Accept()
-		if err != nil {
-			fmt.Println(err)
-			continue
-		}
-		go ConnRW(conn)
-	}
+	fmt.Println(conf)
 }
