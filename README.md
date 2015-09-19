@@ -1,3 +1,3 @@
 # gorinetd
-rinetd implement by go
+rinetd implemented by go
 
